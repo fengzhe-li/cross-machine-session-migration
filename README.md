@@ -1,25 +1,27 @@
 # Cross-Machine Session Migration
 
-This repository contains the implementation artefacts and curated experimental evidence for an MSc dissertation project on cross-machine session migration. The project investigates how computation can be moved from one machine to another while preserving execution state and, where possible, hiding that movement from the client.
+This repository contains the implementation artefacts and curated experimental evidence for an MSc dissertation project on cross-machine session migration. The project studies how a running computation can move from one machine to another while preserving state and, where possible, hiding the movement from the client.
 
-The work is organised as a progression of migration difficulty:
+![Progressive migration framework](docs/figures/established-tcp-vip/progressive_migration_framework.png)
 
-1. application-managed state migration;
-2. Docker/container checkpoint and restore using CRIU;
-3. native process migration using CRIU;
-4. Telefork-based cross-machine process migration;
-5. established TCP session migration using CRIU, a floating virtual IP, and network locking.
-
-## Research Scope
-
-The central research question is:
+## Research Question
 
 > To what extent can a running service session be migrated across machines while preserving computation state and client-visible continuity?
 
-The repository separates two related but different goals:
+The project separates two related goals:
 
 - **Computation migration:** preserving application state, container runtime state, or native process state.
-- **Communication continuity:** keeping the client connected to a stable endpoint, or in the strongest experiment, preserving an already-established TCP session.
+- **Communication continuity:** keeping the client attached to a stable endpoint, and in the strongest experiment preserving an already-established TCP session.
+
+## Migration Levels
+
+| Level / mechanism | Main idea | Final evidence summary |
+|---|---|---:|
+| Level 1 application migration | Application explicitly saves and restores state | Representative state-continuity demonstration |
+| Level 2 Docker/CRIU | Docker checkpoint/restore moves a stateful TCP container | 8/10 final trials |
+| Level 3 native CRIU | CRIU migrates a Linux process outside Docker | 5/5 final trials |
+| Telefork | Telefork migrates process state to a compatible target | 5/5 strict validation |
+| Established TCP + VIP | CRIU TCP restore plus floating VIP preserves an active session | 5/5 final trials |
 
 ## Repository Structure
 
@@ -32,72 +34,98 @@ The repository separates two related but different goals:
 ├── established-tcp-vip/             # CRIU TCP-established migration with floating VIP
 ├── experiments/                     # proxy continuity and same-machine TCP validation
 └── docs/
-    ├── EXPERIMENT_EVIDENCE.md       # detailed evidence narrative
-    ├── FIGURE_INDEX.md              # compact figure index
-    ├── architecture/                # review and architecture notes
-    └── figures/                     # curated dissertation evidence images
+    ├── EXPERIMENT_EVIDENCE.md       # evidence overview
+    ├── FIGURE_INDEX.md              # full figure index
+    ├── evidence/                    # detailed per-mechanism evidence galleries
+    └── figures/                     # curated screenshots, plots, and diagrams
 ```
 
 Large generated artefacts are intentionally excluded: CRIU image files, VM images, Docker image archives, raw logs, caches, keys, and local environment files.
 
-## Migration Levels
+## Level 1: Application-Managed Migration
 
-### Level 1: Application-Managed Migration
+The Level 1 experiment is the warm-up case. The application knows migration is happening and explicitly transfers its own state.
 
-The Level 1 experiment uses an application-aware counter workload. The application explicitly serialises state and restores it on another server instance. This is the warm-up layer: the application knows migration is happening.
+![Baseline restart loses state](docs/figures/level1/baseline_restart_counter_reset.png)
 
 ![Level 1 restored state](docs/figures/level1/level1_server_b_state_restored.png)
 
-This figure shows Server B continuing from transferred application state rather than starting from zero.
+## Level 2: Docker/CRIU Container Migration
 
-### Level 2: Docker/CRIU Container Migration
-
-The Level 2 experiment migrates a Dockerised stateful TCP service using Docker checkpoint/restore with CRIU underneath. The workflow checkpoints the running container, transfers checkpoint state, restores on the target, and uses a stable client-facing endpoint for continuity measurements.
+The Level 2 experiment migrates a Dockerised stateful TCP service using Docker checkpoint/restore. CRIU is used underneath Docker, but the research object here is the container runtime.
 
 ![Docker migration workflow](docs/figures/level2/level2_docker_full_migration_workflow.png)
 
-Final repeated evaluation produced **8 successful migrations out of 10 attempts**. Failed attempts are retained as real failures rather than removed from the dataset.
+![Docker checkpoint transfer restore](docs/figures/level2/level2_docker_checkpoint_transfer_restore_workflow.png)
 
 ![Docker n=10 reliability summary](docs/figures/level2/level2_n10_reliability_summary.png)
 
-### Level 3: Native CRIU Process Migration
+![Docker n=10 timing](docs/figures/level2/docker_n10_timing_2x2_final.png)
 
-The native CRIU experiment moves a Linux process without Docker. It demonstrates process-level checkpoint, transfer, and restore, with counter continuity used as the observable state-preservation signal.
+The final Docker evaluation retained all attempts: **8 successful migrations out of 10**. Failed checkpoint attempts are included as real evidence, not removed from the dataset.
+
+## Level 3: Native CRIU Process Migration
+
+The native CRIU experiment removes Docker and migrates a Linux process directly. Counter continuity is used as the observable state-preservation signal.
 
 ![Native CRIU continuity evidence](docs/figures/level3-native-criu/native_criu_cross_machine_continuity_evidence.png)
 
-Final repeated evaluation produced **5 successful migrations out of 5 attempts**.
+![Native CRIU final summary](docs/figures/level3-native-criu/level3_native_criu_summary.png)
 
-### Telefork
+![Native CRIU timing](docs/figures/level3-native-criu/native_criu_n5_timing_2x2.png)
 
-Telefork was evaluated as an alternative process migration mechanism. The experiment keeps the upstream Telefork implementation intact and uses example programs to migrate a process from source to target while preserving a small runtime state value.
+Final repeated evaluation: **5/5 successful migrations**.
 
-![Telefork migration success](docs/figures/telefork/telefork_cross_machine_migration_success.png)
+## Telefork
 
-The strict final validation recorded **5 successful runs out of 5**, requiring matching source/target evidence and state continuity.
+Telefork is evaluated as an alternative process-migration mechanism. The strict validation requires source-side state, target-side child execution, and state continuation evidence.
 
-### Established TCP + Floating VIP
+![Telefork source validation](docs/figures/telefork/telefork_manual_validation_source.png)
 
-The strongest communication-continuity experiment uses CRIU `--tcp-established`, network locking, runtime dependency packaging, and a floating VIP. An independent Mac client connects to `192.168.64.50:7004` and keeps one TCP session while the server process migrates from `session-source` to `session-target`.
+![Telefork target validation](docs/figures/telefork/telefork_manual_validation_target.png)
+
+![Telefork final n=5 summary](docs/figures/telefork/telefork_final_n5_summary_5of5.png)
+
+Final strict validation: **5/5 successful runs**.
+
+## Established TCP + Floating VIP
+
+The strongest experiment uses an independent Mac client, a floating VIP, CRIU `--tcp-established`, and network locking. The client connects to `192.168.64.50:7004` and keeps the same session while the server process migrates from source to target.
 
 ![Established TCP architecture](docs/figures/established-tcp-vip/established_tcp_experimental_architecture.png)
 
-The claim is carefully bounded: the evidence demonstrates client-visible endpoint continuity, same application session ID, strict counter progress, and matching TCP four-tuple observations before and after migration. Packet-level absence of a second SYN is not claimed unless packet capture evidence is separately collected.
+![Pre-migration four tuple](docs/figures/established-tcp-vip/clean_validation_pre_migration_four_tuple.png)
 
-Final repeated evaluation produced **5 successful migrations out of 5 attempts**.
+![Post-migration four tuple](docs/figures/established-tcp-vip/clean_validation_post_migration_four_tuple.png)
 
 ![Established TCP final summary](docs/figures/established-tcp-vip/final_n5_corrected_summary_5of5-1.png)
+
+![Client latency comparison](docs/figures/established-tcp-vip/client_latency_comparison.png)
+
+Final repeated evaluation: **5/5 successful migrations**.
+
+Claim boundary: the repository demonstrates client-visible endpoint continuity, same application session ID, strict counter progress, and TCP four-tuple observations before and after migration. It does not claim packet-level proof of no second SYN unless packet capture evidence is collected separately.
 
 ## Key Results
 
 | Mechanism | Final repeated result | Main claim supported |
 |---|---:|---|
-| Level 2 Docker/CRIU | 8/10 successful migrations | Container runtime state can be migrated, but checkpoint creation can fail under repeated trials. |
+| Level 2 Docker/CRIU | 8/10 successful migrations | Container runtime state can be migrated, though checkpoint creation can fail under repeated trials. |
 | Level 3 Native CRIU | 5/5 successful migrations | Native process state can be checkpointed, transferred, and restored with counter continuity. |
 | Telefork | 5/5 strict validation runs | A running process can resume on a target machine with preserved application state. |
-| Established TCP + VIP | 5/5 successful migrations | An already-established client session can continue across source-to-target migration using CRIU TCP restore and VIP handover. |
+| Established TCP + VIP | 5/5 successful migrations | An already-established client session can continue across source-to-target migration in the tested environment. |
 
-More complete evidence, including representative screenshots and repeated-trial figures, is documented in [docs/EXPERIMENT_EVIDENCE.md](docs/EXPERIMENT_EVIDENCE.md). A compact list of all curated figures is available in [docs/FIGURE_INDEX.md](docs/FIGURE_INDEX.md).
+## Evidence
+
+The full curated evidence collection is intentionally larger than the README:
+
+- [Experiment evidence overview](docs/EXPERIMENT_EVIDENCE.md)
+- [Level 1 evidence](docs/evidence/LEVEL1_EVIDENCE.md)
+- [Level 2 Docker/CRIU evidence](docs/evidence/LEVEL2_DOCKER_CRIU_EVIDENCE.md)
+- [Native CRIU evidence](docs/evidence/NATIVE_CRIU_EVIDENCE.md)
+- [Telefork evidence](docs/evidence/TELEFORK_EVIDENCE.md)
+- [Established TCP + VIP evidence](docs/evidence/ESTABLISHED_TCP_VIP_EVIDENCE.md)
+- [Full figure index](docs/FIGURE_INDEX.md)
 
 ## Notes on Telefork Source
 
