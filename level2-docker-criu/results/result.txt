@@ -1,0 +1,36 @@
+Level 2 - Docker Container Checkpoint/Restore Migration
+
+Source runtime counter before checkpoint:
+214
+
+Target runtime counter after restore:
+215
+216
+217
+
+Post-restore request:
+runtime_counter=217
+
+Checkpoint size:
+4.2 MB
+
+Checkpoint time:
+205 ms
+
+Copy-to-Server-A time:
+7 ms
+
+Simulated transfer time:
+2 ms
+
+Restore time:
+83 ms
+
+State continuity:
+PASS
+
+Post-restore service availability:
+PASS
+
+Conclusion:
+The running Docker container was checkpointed and restored while preserving runtime application state. The runtime counter continued from 214 to 215 after restoration rather than restarting from the initial state.

@@ -1,0 +1,14 @@
+Connection Redirection Experiment Summary
+
+Total requests: 47
+Successful requests: 47
+Failed requests: 0
+Switch time: 1786359932.879881
+Successful requests after switch: 27
+Successful Server B requests after switch: 27
+Measured downtime until first Server B response: 0.135 s
+
+Interpretation:
+The client used one stable proxy endpoint for the whole run.
+A successful Server B response after the switch shows that backend redirection
+was hidden behind the proxy endpoint.

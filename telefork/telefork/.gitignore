@@ -1,0 +1,10 @@
+/target
+**/*.rs.bk
+Cargo.lock
+*.bin
+*.sublime-*
+docker-extras-bin
+rust-analyzer.sh
+# this is just the iTerm2 imgcat script, I use it for a demo and because Docker it's easy to have it here
+imgcat.sh
+render.png

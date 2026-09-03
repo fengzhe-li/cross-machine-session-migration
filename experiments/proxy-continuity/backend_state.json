@@ -1,0 +1,13 @@
+{
+  "active_backend": "serverA",
+  "backends": {
+    "serverA": {
+      "host": "127.0.0.1",
+      "port": 9101
+    },
+    "serverB": {
+      "host": "127.0.0.1",
+      "port": 9102
+    }
+  }
+}
